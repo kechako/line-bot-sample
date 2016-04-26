@@ -17,10 +17,7 @@ import (
 	"google.golang.org/appengine/urlfetch"
 )
 
-type Callback struct {
-}
-
-func (c Callback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func callbackHandler(w http.ResponseWriter, r *http.Request) {
 	ctx := appengine.NewContext(r)
 
 	if r.Method != "POST" {
@@ -91,6 +88,5 @@ func sendEcho(to []string, text string, ctx context.Context) error {
 }
 
 func init() {
-	c := &Callback{}
-	http.Handle("/callback", c)
+	http.HandleFunc("/callback", callbackHandler)
 }
