@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httputil"
+	"net/url"
 	"strings"
 
 	"github.com/kechako/line-bot-client"
@@ -13,7 +14,9 @@ import (
 	"golang.org/x/net/context"
 
 	"google.golang.org/appengine"
+	"google.golang.org/appengine/datastore"
 	"google.golang.org/appengine/log"
+	"google.golang.org/appengine/taskqueue"
 	"google.golang.org/appengine/urlfetch"
 )
 
@@ -55,15 +58,57 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		err = sendEcho([]string{msg.From}, msg.Text, ctx)
+		// Datastore にメッセージを保存
+		key := datastore.NewKey(ctx, "LineMessage", msg.Id, 0, nil)
+		_, err = datastore.Put(ctx, key, msg)
 		if err != nil {
-			log.Errorf(ctx, "%v\n", err)
-			http.Error(w, "Send echo error.", http.StatusInternalServerError)
+			log.Errorf(ctx, "Datastore put error : %s", err.Error())
+			http.Error(w, "Datastore put error", http.StatusInternalServerError)
+			return
+		}
+
+		// Taskqueue に登録
+		task := taskqueue.NewPOSTTask("/echo", url.Values{
+			"id": {msg.Id},
+		})
+		_, err = taskqueue.Add(ctx, task, "echo")
+		if err != nil {
+			log.Errorf(ctx, "Taskqueue error : %s", err.Error())
+			http.Error(w, "Taskqueue error", http.StatusInternalServerError)
 			return
 		}
 	}
 
-	fmt.Fprintf(w, "Echo OK")
+	fmt.Fprintf(w, "OK")
+}
+
+func echoHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := appengine.NewContext(r)
+
+	id := r.FormValue("id")
+
+	if id == "" {
+		log.Errorf(ctx, "Id is empty")
+		http.Error(w, "Id is empty", http.StatusBadRequest)
+		return
+	}
+
+	// Datastore からメッセージ取得
+	key := datastore.NewKey(ctx, "LineMessage", id, 0, nil)
+	msg := &line.Message{}
+	err := datastore.Get(ctx, key, msg)
+	if err != nil {
+		log.Errorf(ctx, "Datastore get error : %s", err.Error())
+		http.Error(w, "Datastore get error", http.StatusInternalServerError)
+		return
+	}
+
+	err = sendEcho([]string{msg.From}, msg.Text, ctx)
+	if err != nil {
+		log.Errorf(ctx, "%v\n", err)
+		http.Error(w, "Send echo error.", http.StatusInternalServerError)
+		return
+	}
 }
 
 func sendEcho(to []string, text string, ctx context.Context) error {
@@ -89,4 +134,5 @@ func sendEcho(to []string, text string, ctx context.Context) error {
 
 func init() {
 	http.HandleFunc("/callback", callbackHandler)
+	http.HandleFunc("/echo", echoHandler)
 }

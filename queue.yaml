@@ -1,0 +1,5 @@
+total_storage_limit: 50M
+queue:
+- name: echo
+  rate: 35/s
+
