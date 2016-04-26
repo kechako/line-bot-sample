@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/http/httputil"
 	"strings"
 
-	"github.com/kechako/line-bot-sample/line"
-
+	"github.com/kechako/line-bot-client"
 	"github.com/pkg/errors"
 
 	"golang.org/x/net/context"
@@ -36,6 +36,11 @@ func (c Callback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	defer r.Body.Close()
 
+	dump, err := httputil.DumpRequest(r, true)
+	if err == nil {
+		log.Infof(ctx, "Request : %s", dump)
+	}
+
 	req, err := line.ParseRequest(r.Body)
 	if err != nil {
 		log.Errorf(ctx, "Can nott parse request : %s", err.Error())
@@ -44,7 +49,12 @@ func (c Callback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	for _, res := range req.Result {
-		if res.EventType != line.EventTypeMessage || res.Message.ContentType != line.ContentTypeText {
+		if res.EventType != line.EventTypeMessage || res.Message == nil {
+			continue
+		}
+
+		msg := res.Message
+		if msg.ContentType != line.ContentTypeText {
 			continue
 		}
 
@@ -60,8 +70,8 @@ func (c Callback) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func sendEcho(to []string, text string, ctx context.Context) error {
-	e := NewEvent(to)
-	e.Content = NewText(text)
+	e := line.NewEvent(to)
+	e.Content = line.NewText(text)
 
 	resp, err := e.Send(urlfetch.Client(ctx))
 	if err != nil {
