@@ -6,4 +6,5 @@ func init() {
 	http.HandleFunc("/callback", callbackHandler)
 	http.HandleFunc("/echo", echoHandler)
 	http.HandleFunc("/vision", visionHandler)
+	http.HandleFunc("/rainfall", rainfallHandler)
 }

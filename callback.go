@@ -49,7 +49,9 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		msg := res.Message
-		if msg.ContentType != line.ContentTypeText && msg.ContentType != line.ContentTypeImage {
+		if msg.ContentType != line.ContentTypeText &&
+			msg.ContentType != line.ContentTypeImage &&
+			msg.ContentType != line.ContentTypeLocation {
 			continue
 		}
 
@@ -72,6 +74,9 @@ func callbackHandler(w http.ResponseWriter, r *http.Request) {
 		case line.ContentTypeImage:
 			path = "/vision"
 			queue = "vision"
+		case line.ContentTypeLocation:
+			path = "/rainfall"
+			queue = "rainfall"
 		}
 		task := taskqueue.NewPOSTTask(path, url.Values{
 			"id": {msg.Id},
